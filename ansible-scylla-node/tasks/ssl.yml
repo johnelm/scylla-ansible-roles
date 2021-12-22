@@ -26,6 +26,7 @@
         provider: selfsigned
   delegate_to: localhost
   run_once: true
+  become_user: ec2-user
 
 - name: Generate keys signed by the local CA and push them to the nodes
   block:
@@ -34,11 +35,13 @@
         path: "./ssl/{{ inventory_hostname }}"
         state: directory
       delegate_to: localhost
+      become_user: ec2-user
 
     - name: Generate an OpenSSL private key.
       openssl_privatekey:
         path: "./ssl/{{ inventory_hostname }}/{{ inventory_hostname }}.pem"
       delegate_to: localhost
+      become_user: ec2-user
 
     - name: Generate an OpenSSL Certificate Signing Request
       openssl_csr:
@@ -46,6 +49,7 @@
         privatekey_path: "./ssl/{{ inventory_hostname }}/{{ inventory_hostname }}.pem"
         common_name: "{{ inventory_hostname }}.{{ scylla_cluster_name }}.internal"
       delegate_to: localhost
+      become_user: ec2-user
 
     - name: Generate an OpenSSL certificate signed with our CA certificate
       openssl_certificate:
@@ -55,6 +59,7 @@
         ownca_privatekey_path: "./ssl/ca/{{ scylla_cluster_name }}-ca.pem"
         provider: ownca
       delegate_to: localhost
+      become_user: ec2-user
 
     - name: Copy the certificates into their proper locations
       copy:
@@ -75,4 +80,5 @@
     dest: ./cqlshrc
   delegate_to: localhost
   run_once: true
+  become_user: ec2-user
 

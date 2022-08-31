@@ -104,6 +104,11 @@
     scylla_setup --no-raid-setup --nic {{ scylla_nic }} --setup-nic-and-disks --no-ec2-check --no-kernel-check --no-ntp-setup --no-io-setup --no-node-exporter --no-coredump-setup --no-sysconfig-setup
   become: true
   when: ansible_facts.services["scylla-server.service"] is defined and ansible_facts.services["scylla-server.service"]["state"] != "running"
+# - name: configure Scylla
+#   shell: |
+#     scylla_setup --no-raid-setup --nic {{ scylla_nic }} --setup-nic-and-disks --no-kernel-check --no-ntp-setup --no-io-setup --no-node-exporter --no-coredump-setup --no-sysconfig-setup
+#   become: true
+#   when: ansible_facts.services["scylla-server.service"] is defined and ansible_facts.services["scylla-server.service"]["state"] != "running"
 
 - name: configure scylla.yaml
   template:
@@ -241,7 +246,7 @@
 
     - name: wait for the cluster to become healthy
       shell: |
-        nodetool status|grep -E '^UN|^UJ|^DN'|wc -l
+        nodetool status -Dcom.sun.jndi.rmiURLParsing=legacy | grep -E '^UN|^UJ|^DN'|wc -l
       register: node_count
       until: node_count.stdout|int == ansible_play_batch|length
       retries: 300

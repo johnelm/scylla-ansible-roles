@@ -97,11 +97,19 @@
   notify:
     - node_exporter start
   ignore_errors: true
-  #TODO: stop ignoring errors when the node_exporter_install script fix is available in all actual versions
+  #TODO: stop ignoring errors when the node_exporter_install script fix is available in all actual versions, resp. use only for < 5.0 / 2022
+
+- name: node exporter setup from 5.0/2022
+  service:
+        name: scylla-node-exporter
+        state: started
+  become: true
+  ignore_errors: true
+  #TODO: stop ignoring errors when a version check is added
 
 - name: configure Scylla
   shell: |
-    scylla_setup --no-raid-setup --nic {{ scylla_nic }} --setup-nic-and-disks --no-ec2-check --no-kernel-check --no-ntp-setup --no-io-setup --no-node-exporter --no-coredump-setup --no-sysconfig-setup
+    scylla_setup --no-raid-setup --nic {{ scylla_nic }} --setup-nic-and-disks --no-ec2-check --no-kernel-check --no-ntp-setup --no-io-setup --no-node-exporter --no-coredump-setup --no-sysconfig-setup --no-swap-setup
   become: true
   when: ansible_facts.services["scylla-server.service"] is defined and ansible_facts.services["scylla-server.service"]["state"] != "running"
 # - name: configure Scylla
@@ -139,6 +147,10 @@
     shell: |
       scylla_coredump_setup --dump-to-raiddir
     when: skip_coredump is defined and skip_coredump|bool == false
+  - name: set up swap
+    shell: |
+      scylla_swap_setup{% if swap_size_gb is defined and swap_size_gb != 0 %} --swap-size {{ swap_size_gb }} {% endif %}
+    when: skip_swap is defined and skip_swap|bool == false
 
   - name: configure cpu scaling
     shell: |
@@ -222,21 +234,46 @@
 
 - name: start_scylla_service dependent tasks
   block:
-    - name: start scylla seeds
-      service:
-        name: scylla-server
-        state: started
-      become: true
-      when: vars['ansible_'~scylla_nic].ipv4.address in scylla_seeds or inventory_hostname in scylla_seeds
+    # scylla_listen_address is a composite indirect value that depends on another per-host value - scylla_nic.
+    # Therefore in order to be able to get the corresponding value via hostvars[item] later in the play we need to
+    # have an actual value resolved.
+    # One way to do that is to resolve it and store as an Ansible fact.
+    - name: Resolve a scylla_listen_address as a fact
+      set_fact:
+        listen_address: "{{ scylla_listen_address }}"
 
-    - name: start scylla non-seeds
+    # The same relates to the below
+    - name: Resolve scylla_broadcast_address
+      set_fact:
+        broadcast_address: "{{ scylla_broadcast_address }}"
+
+    - name: Generate tokens for the new nodes
+      run_once: true
+      include_tasks: generate_tokens.yml
+      when: token_distributor is defined
+
+    # Start all seeders together since we don't know which one is the "first" - so let them figure it by themselves
+    - name: start scylla on seeders
       service:
         name: scylla-server
         state: started
       become: true
+      when: broadcast_address in scylla_seeds or inventory_hostname in scylla_seeds
+
+    - name: Wait for CQL port on seeders
+      wait_for:
+        port: 9042
+        host: "{{ listen_address }}"
+        timeout: "{{ scylla_bootstrap_wait_time_sec }}"
+      when: broadcast_address in scylla_seeds or inventory_hostname in scylla_seeds
+
+    - name: Start scylla non-seeds nodes serially
+      run_once: true
+      include_tasks: start_one_node.yml
+      loop: "{{ groups['scylla'] }}"
       when:
-        - vars['ansible_'~scylla_nic].ipv4.address not in scylla_seeds
-        - inventory_hostname not in scylla_seeds
+        - item not in scylla_seeds
+        - hostvars[item]['broadcast_address'] not in scylla_seeds
 
     - name: wait for the API port to come up on all nodes
       wait_for:
@@ -260,18 +297,26 @@
         method: GET
       register: _result
       until: _result.status == 200
-      retries: 60
+      retries: 90
       delay: 1
 
-    - name: generate monitoring configuration
-      include_tasks: monitoring_config.yml
-      when: generate_monitoring_config|bool
-      run_once: true
+    - name: Delete initial_token in scylla.yaml
+      lineinfile:
+        path: /etc/scylla/scylla.yaml
+        regexp: '^initial_token:'
+        line: ""
+      become: true
+      when: token_distributor is defined
+  when: start_scylla_service is defined and start_scylla_service|bool
 
-    - name: configure the Manager agents
-      include_tasks: manager_agents.yml
-      when: scylla_manager_enabled|bool
-  when:  start_scylla_service is defined and start_scylla_service|bool
+- name: generate monitoring configuration
+  include_tasks: monitoring_config.yml
+  when: generate_monitoring_config|bool
+  run_once: true
+
+- name: configure the Manager agents
+  include_tasks: manager_agents.yml
+  when: scylla_manager_enabled|bool
 
 - name: Update sysctl
   sysctl:

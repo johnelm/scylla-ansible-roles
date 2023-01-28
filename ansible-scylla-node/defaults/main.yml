@@ -13,9 +13,15 @@ upgrade_version: false
 
 # Defines if the upgrade is 'major' or 'minor' (patch)
 # Values:
-#  [default] true: 'major' upgrade
-#  false: 'minor' upgrade
-upgrade_major: true
+#  [default] false: 'minor' upgrade
+#  true: 'major' upgrade
+upgrade_major: false
+
+# Defines if the upgrade process must be forced
+# Values:
+#  [default] true: always upgrade even if the same version is installed
+#  false: don't do anything
+upgrade_force: true
 
 # Defines if the upgrade process should rollback on failure
 # Values:
@@ -94,14 +100,21 @@ install_type: online
 firewall_enabled: false
 
 # URL of an RPM .repo file or a DEB .list file
+# deprecated in favour of below, it will be dropped soon, below should be used
 scylla_repos:
   - http://downloads.scylladb.com/rpm/centos/scylla-2021.1.repo
 
+scylla_deb_repos:
+  - http://downloads.scylladb.com/deb/ubuntu/scylla-2021.1.list
 
-# Use a newer kernel from ELRepo (recommended for RHEL/CentOS)
+scylla_rpm_repos: "{{ scylla_repos }}"
+
+# Use a newer kernel from ELRepo (was recommended for RHEL/CentOS until 5.11)
 # Reboot after the elrepo kernel has been installed is recommended as well.
-elrepo_kernel: True
-reboot_after_kernel_upgrade: True
+# Note that kernel 5.16 has serious issues on GCP and on Azure, last known
+# working kernel was 5.11 that can now only be used from archives
+elrepo_kernel: False
+reboot_after_kernel_upgrade: False
 
 # set this to false when the role isn't being applied to a full inventory reflecting the whole cluster
 full_inventory: true
@@ -124,6 +137,7 @@ scylla_repo_keys:
   - 5e08fbd8b5d6ec9c
 
 scylla_manager_repo_keys:
+  - 5e08fbd8b5d6ec9c
   - 6B2BFD3660EF3F5B
   - 17723034C56D4B19
 
@@ -144,7 +158,8 @@ scylla_dependencies:
 
 # Specify a Scylla version here (should be available in repo)
 # ex: scylla_version: 2019.1.9 or 3.2.1
-scylla_version: latest
+# Default is intentionally invalid version - it MUST be overridden
+scylla_version: '0.0.0'
 
 # Options are oss|enterprise
 #scylla_edition: oss
@@ -178,6 +193,7 @@ scylla_seeds:
 scylla_listen_address: "{{ vars['ansible_'~scylla_nic].ipv4.address }}"
 scylla_rpc_address: "{{ vars['ansible_'~scylla_nic].ipv4.address }}"
 scylla_broadcast_address: "{{ vars['ansible_'~scylla_nic].ipv4.address }}"
+scylla_broadcast_rpc_address: "{{ scylla_rpc_address }}"
 
 scylla_api_address: '127.0.0.1'
 scylla_api_port: '10000'
@@ -187,7 +203,6 @@ scylla_api_port: '10000'
 scylla_yaml_params:
   authorizer: CassandraAuthorizer
   authenticator: PasswordAuthenticator
-  enable_sstables_mc_format: true
   internode_compression: all
 
 # SSL configuration for Scylla nodes:
@@ -214,7 +229,12 @@ generate_monitoring_config: True
 
 # If Scylla Manager will be used, set the following variables
 scylla_manager_enabled: true
-scylla_manager_repo_url: "http://downloads.scylladb.com/rpm/centos/scylladb-manager-2.4.repo"
+# deprecated in favour of below, it will be dropped soon, below should be used
+scylla_manager_repo_url: "http://downloads.scylladb.com/rpm/centos/scylladb-manager-2.6.repo"
+
+scylla_manager_deb_repo_url: "http://downloads.scylladb.com/deb/ubuntu/scylladb-manager-2.6.list"
+scylla_manager_rpm_repo_url: "{{ scylla_manager_repo_url }}"
+
 scylla_manager_agent_upgrade: true
 
 # Manager Agent Backup configuration - this is a free text which will be inserted into the configuration file
@@ -240,10 +260,32 @@ scylla_manager_agent_config: |
   # - /dev/nvme0n3
 
 skip_coredump: False
-skip_sysconfig: False
+#below can be dangerous, sysconfig also sets cpuset, so disable both to not do any cpuset.conf changes!
 skip_cpuset: False
+skip_sysconfig: False
 skip_selinux: False
 skip_ntp: False
+skip_swap: False
+
+# Set it to 0 to let scylla choose the swap size
+swap_size_gb: 0
+
+# If defined, this enables the usage of a separate token_distributor instead of scylla's default random token distributor
+# The token distributor in the provided path must be named token_distributor.py and must have the following list of arguments:
+# --node, --rack, --dc, --rf and --get-current-tokens.
+# --node must be followed by a comma-separated list with the all the nodes in the cluster.
+# --rack must be followed by a comma-separated list indicating the racks of each one of the nodes in the node list,
+#        in the same order as the nodes were provided.
+# --dc must be followed by a comma-separated list indicating the datacenters of each one of the nodes in the node list,
+#      in the same order as the nodes were provided.
+# --rf must be followed by a comma-separated list indicating the replication-factors for which the token ring should
+#      be optimized. Example: "dc1=3,dc2=2".
+# token_distributor:
+#   path: /path/too/token_distributor
+#   rf: us-east1=3,us-east2=2
+
+# Default bootstrap timeout
+scylla_bootstrap_wait_time_sec: 25200
 
 # sysctl tuning defaults, please leave in place if unsure
 update_sysctl: True

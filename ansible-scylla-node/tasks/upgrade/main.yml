@@ -16,13 +16,13 @@
           minimum_version: '8.0',
           template: 'redhat',
           oss: ['4.4','4.3','4.2','4.1'],
-          enterprise: ['2021.1','2020.1'] 
+          enterprise: ['2022.2','2022.1','2021.1','2020.1']
         },
         '7': {
           minimum_version: '7.3',
           template: 'redhat',
           oss: ['4.4','4.3','4.2','4.1','4.0'],
-          enterprise: ['2021.1','2020.1'] 
+          enterprise: ['2022.2','2022.1','2021.1','2020.1']
         }
       },
       # Debian
@@ -31,13 +31,13 @@
           minimum_version: '10',
           template: 'debian',
           oss: ['4.4','4.3','4.2','4.1'],
-          enterprise: ['2021.1','2020.1'] 
+          enterprise: ['2022.2','2022.1','2021.1','2020.1']
         },
         '9': {
           minimum_version: '9',
           template: 'debian',
           oss: ['4.4','4.3','4.2','4.1','4.0'],
-          enterprise: ['2021.1','2020.1'] 
+          enterprise: ['2022.2','2022.1','2021.1','2020.1']
         }
       },
       # Ubuntu
@@ -46,19 +46,19 @@
           minimum_version: '20.04',
           template: 'ubuntu',
           oss: ['4.4','4.3'],
-          enterprise: ['2021.1'] 
+          enterprise: ['2022.2','2021.1']
         },
         '18': {
           minimum_version: '18.04',
           template: 'ubuntu',
           oss: ['4.4','4.3','4.2','4.1','4.0'],
-          enterprise: ['2021.1','2020.1'] 
+          enterprise: ['2022.2','2021.1','2020.1']
         },
         '16': {
           minimum_version: '16.04',
           template: 'ubuntu',
           oss: ['4.4','4.3','4.2','4.1','4.0'],
-          enterprise: ['2021.1','2020.1'] 
+          enterprise: ['2022.2','2021.1','2020.1']
         }
       },
       # Red Hat
@@ -67,13 +67,13 @@
           minimum_version: '8.0',
           template: 'redhat',
           oss: ['4.4','4.3','4.2','4.1'],
-          enterprise: ['2021.1','2020.1'] 
+          enterprise: ['2022.2','2022.1','2021.1','2020.1']
         },
         '7': {
           minimum_version: '7.2',
           template: 'redhat',
           oss: ['4.4','4.3','4.2','4.1','4.0'],
-          enterprise: ['2021.1','2020.1'] 
+          enterprise: ['2022.2','2022.1','2021.1','2020.1']
         }
       }        
     }
@@ -151,7 +151,7 @@
   ansible.builtin.fail:
     msg: "Version {{ scylla_upgrade['version'] }} specified for Scylla {{ scylla_upgrade['edition_friendly_name'] }} can't be used as a major upgrade since version detected is {{ scylla_detected['version'] }}."
   when: >
-      upgrade_major and
+      upgrade_major and not upgrade_force and
       (scylla_detected['version'] == scylla_upgrade['version'] or
       scylla_detected['major_version'] == scylla_upgrade['major_version'])
 
@@ -159,7 +159,7 @@
   ansible.builtin.fail:
     msg: "Version {{ scylla_upgrade['version'] }} specified for Scylla {{ scylla_upgrade['edition_friendly_name'] }} can't be used as a minor upgrade since version detected is {{ scylla_detected['version'] }}."
   when: >
-      not upgrade_major and
+      not upgrade_major and not upgrade_force and
       (scylla_detected['version'] == scylla_upgrade['version'] or
       scylla_detected['major_version'] != scylla_upgrade['major_version'])
 

@@ -1,12 +1,12 @@
 ---
-name: Molecule Test for ansible-scylla-node role
+name: Molecule Test for ansible-scylla-monitoring role
 on:
   push:
     paths:
-      - 'ansible-scylla-node/**'
+      - 'ansible-scylla-monitoring/**'
   pull_request:
     paths:
-      - 'ansible-scylla-node/**'
+      - 'ansible-scylla-monitoring/**'
     branches:
       - master
 jobs:
@@ -17,17 +17,10 @@ jobs:
       max-parallel: 4
       matrix:
         molecule_distro:
-          #- centos7
-          - centos8
-          #- debian9
-          #- debian10
-          #- fedora
-          #- ubuntu1604
-          - ubuntu1804
           - ubuntu2004
     defaults:
       run:
-        working-directory: ansible-scylla-node
+        working-directory: ansible-scylla-monitoring
     steps:
       - uses: actions/checkout@v2
         with:

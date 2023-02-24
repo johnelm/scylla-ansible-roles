@@ -2,6 +2,10 @@
 # This playbook follows the Scylla rolling restart procedure described at https://docs.scylladb.com/operating-scylla/procedures/config-change/rolling_restart/
 # This playbook expects at least Scylla version 2021, which has seedless feature
 # The play must be run with the --limit argument, specifying either "all" or a list of node IPs
+#
+# In order to perform a rolling reboot set a 'reboot_hosts' boolean. By default, hosts are not rebooted.
+# For example
+#    ansible-playbook -i inventory.ini --limit x.y.z.k --extra-vars "reboot_hosts=true" <path to a playbook>/rolling_restart.yml
 
 - name: Rolling restart across a Scylla cluster - restart all inventory nodes
   hosts: scylla
@@ -26,7 +30,7 @@
     - name: wait for DRAIN to complete
       shell: |
         journalctl -u scylla-server --since "1 minute ago" | grep 'storage_service' | grep 'DRAINED'
-      retries: 300
+      retries: 3000
       delay: 1
       register: drain_result
       until: drain_result.rc == 0
@@ -37,6 +41,16 @@
         name: scylla-server
         state: stopped
 
+    - name: Reboot host and wait for it to restart
+      reboot:
+        msg: "Reboot initiated by Ansible"
+        connect_timeout: 5
+        reboot_timeout: 600
+        pre_reboot_delay: 0
+        post_reboot_delay: 30
+        test_command: whoami
+      when: reboot_hosts is defined and reboot_hosts|bool
+
     - name: Start Scylla service
       service:
         name: scylla-server
@@ -46,12 +60,12 @@
       wait_for:
         port: 9042
         host: "{{ listen_address.stdout }}"
-        timeout: 300
+        timeout: 3000
 
     - name: wait for the cluster to become healthy
       shell: |
         nodetool status|grep "{{ listen_address.stdout }}" | grep '^UN'
       register: node_status
       until: node_status.rc == 0
-      retries: 300
+      retries: 3000
       delay: 1

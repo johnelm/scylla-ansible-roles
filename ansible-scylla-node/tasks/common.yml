@@ -92,7 +92,7 @@
 - name: node exporter setup
   shell: |
     node_exporter_install --force
-  when: install_type == 'online'
+  when: false
   become: true
   notify:
     - node_exporter start
@@ -105,13 +105,14 @@
         state: started
   become: true
   ignore_errors: true
+  when: false
   #TODO: stop ignoring errors when a version check is added
 
 - name: configure Scylla
   shell: |
     scylla_setup --no-raid-setup --nic {{ scylla_nic }} --setup-nic-and-disks --no-ec2-check --no-kernel-check --no-ntp-setup --no-io-setup --no-node-exporter --no-coredump-setup --no-sysconfig-setup --no-swap-setup
   become: true
-  when: ansible_facts.services["scylla-server.service"] is defined and ansible_facts.services["scylla-server.service"]["state"] != "running"
+  when: false #ansible_facts.services["scylla-server.service"] is defined 
 # - name: configure Scylla
 #   shell: |
 #     scylla_setup --no-raid-setup --nic {{ scylla_nic }} --setup-nic-and-disks --no-kernel-check --no-ntp-setup --no-io-setup --no-node-exporter --no-coredump-setup --no-sysconfig-setup
@@ -150,7 +151,7 @@
   - name: set up swap
     shell: |
       scylla_swap_setup{% if swap_size_gb is defined and swap_size_gb != 0 %} --swap-size {{ swap_size_gb }} {% endif %}
-    when: skip_swap is defined and skip_swap|bool == false
+    when: false #skip_swap is defined and skip_swap|bool == false
 
   - name: configure cpu scaling
     shell: |
@@ -270,9 +271,10 @@
     - name: Start scylla non-seeds nodes serially
       run_once: true
       include_tasks: start_one_node.yml
-      loop: "{{ groups['scylla'] }}"
+      loop: "{{ ansible_play_hosts }}"
       when:
         - item not in scylla_seeds
+        # - not ( broadcast_address in scylla_seeds or inventory_hostname in scylla_seeds )
         - hostvars[item]['broadcast_address'] not in scylla_seeds
 
     - name: wait for the API port to come up on all nodes
@@ -285,7 +287,7 @@
       shell: |
         nodetool status -Dcom.sun.jndi.rmiURLParsing=legacy | grep -E '^UN|^UJ|^DN'|wc -l
       register: node_count
-      until: node_count.stdout|int == ansible_play_batch|length
+      until: node_count.stdout|int == 3
       retries: 300
       delay: 1
       when: full_inventory|bool

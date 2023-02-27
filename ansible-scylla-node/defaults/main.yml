@@ -134,9 +134,11 @@ start_scylla_service: true
 # Only relevant for Debian/Ubuntu
 scylla_repo_keyserver: 'hkp://keyserver.ubuntu.com:80'
 scylla_repo_keys:
+  - d0a112e067426ab2
   - 5e08fbd8b5d6ec9c
 
 scylla_manager_repo_keys:
+  - d0a112e067426ab2
   - 5e08fbd8b5d6ec9c
   - 6B2BFD3660EF3F5B
   - 17723034C56D4B19
@@ -174,6 +176,12 @@ gpfs_prefer_local: "true"
 # IO settings
 # probe for IO figures on one node and reuse the figures on all nodes (recommended: True)
 scylla_io_probe: True
+
+# If set to True, scylla_io_probe must be True and dc variable must be defined in the inventory
+# for each one of the nodes.
+# This will make sure that scylla_io_setup will be executed in one node from each datacenter
+# and then the configuration files will be propagated for the other nodes of each datacenter.
+scylla_io_probe_dc_aware: False
 
 # These can be arbitrarily set if scylla_io_probe is set to False
 # io_properties:
@@ -260,6 +268,7 @@ scylla_manager_agent_config: |
   # - /dev/nvme0n3
 
 skip_coredump: False
+devmode: False
 #below can be dangerous, sysconfig also sets cpuset, so disable both to not do any cpuset.conf changes!
 skip_cpuset: False
 skip_sysconfig: False
@@ -267,8 +276,9 @@ skip_selinux: False
 skip_ntp: False
 skip_swap: False
 
-# Set it to 0 to let scylla choose the swap size
-swap_size_gb: 0
+# Set it to 0 to let scylla choose the swap size.
+# Note that the minimum supported value is 1024mb, so any non-zero value smaller than 1024 will be changed to 1024
+swap_file_size_mb: 0
 
 # If defined, this enables the usage of a separate token_distributor instead of scylla's default random token distributor
 # The token distributor in the provided path must be named token_distributor.py and must have the following list of arguments:

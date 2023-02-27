@@ -1,7 +1,7 @@
 # Configured by Ansible Scylla role
 # Additional parameters can be edited right here for all-node distribution
 
-cluster_name: "{{ scylla_cluster_deployment_name }}"
+cluster_name: "{{ scylla_cluster_name }}"
 
 data_file_directories:
     - /var/lib/scylla/data
@@ -67,6 +67,6 @@ server_encryption_options:
 system_info_encryption:
    enabled: True
    cipher_algorithm: AES
-   secret_key_strength: 128
+   secret_key_strength: 256
    key_provider: LocalFileSystemKeyProviderFactory
    secret_key_file: /etc/scylla/resources/system_keys/systemKey.pem #}
